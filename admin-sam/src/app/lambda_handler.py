@@ -18,8 +18,10 @@ class MyRouter:
                 continue
             (match, params) = self.path_match(req_path_parts, self.split_path(path))
             if match:
-                if auth_required and (not req.user):
-                    raise MyError('Failed to authenticate the user', 403)
+                if auth_required:
+                    if (not req.user) or (req.user.token_expired()):
+                        raise MyError('Failed to authenticate the user', 403)
+                    req.user.update_token_used_at()
                 return MyResp(handler(req, *params))
         raise MyError('Did not find the handler', 404)
 
@@ -51,6 +53,8 @@ def handle(event, context):
         req = MyReq(event)
         router = MyRouter([
             ('GET', '/ping', False, user_controller.ping),
+            ('POST', '/send-login-link', False, user_controller.send_login_link),
+            ('POST', '/verify-token', False, user_controller.verify_token),
         ])
         return router.route(req)
     except MyError as err:

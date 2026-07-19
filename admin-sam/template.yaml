@@ -11,6 +11,32 @@ Globals:
     Timeout: 30
 
 Resources:
+  MyUsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "ClawEC2Users"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        -
+          AttributeName: "email"
+          AttributeType: "S"
+        -
+          AttributeName: "token"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "email"
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        -
+          IndexName: "tokenGSI"
+          KeySchema:
+            -
+              AttributeName: "token"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+
   MyAppFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -28,6 +54,24 @@ Resources:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
+            Effect: Allow
+            Resource: "*"
+          - Action: [
+              "dynamodb:GetItem",
+              "dynamodb:PutItem",
+              "dynamodb:Query",
+              "dynamodb:Scan",
+              "dynamodb:UpdateItem",
+              "dynamodb:BatchExecuteStatement",
+              "dynamodb:BatchWriteItem"
+            ]
+            Effect: Allow
+            Resource:
+              - !GetAtt MyUsersTable.Arn
+              - !Join [ '/',[!GetAtt MyUsersTable.Arn, index/*]]
+          - Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
             Effect: Allow
             Resource: "*"
           Version: '2012-10-17'

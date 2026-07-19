@@ -22,12 +22,19 @@
           </div>
 
           <div class="navbar-end">
-            <a class="navbar-item" v-if="token" @click="signout">
-              <span class="icon">
-                <i class="fas fa-sign-out-alt"></i>
-              </span>
-              <span>Sign out</span>
-            </a>
+            <div class="navbar-item has-dropdown is-hoverable" v-if="token">
+              <a class="navbar-link">
+                <span class="icon">
+                  <i class="fas fa-user"></i>
+                </span>
+              </a>
+
+              <div class="navbar-dropdown">
+                <a class="navbar-item" @click="signout">
+                  <span>Sign out</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -55,25 +62,22 @@ export default {
     server () {
       return this.$store.state.config.server
     },
-    myUsername () {
-      return this.$store.state.user.username
-    },
   },
   methods: {
     signout () {
       this.$store.commit('user/reset')
     },
-    getUsers () {
+    verifyToken () {
       var message = {
-        username: this.myUsername,
         token: this.token,
       }
-      this.$http.post(this.server + '/myapp/get-org-users/', message).then(resp => {
-        this.$store.commit('org/setUsersMap', resp.body)
+      this.$http.post(this.server + '/verify-token/', message).then(resp => {
+        var user = resp.body
+        user.token = this.token
+        this.$store.commit('user/setUser', user)
       }, err => {
         this.error = err.body
         this.$store.commit('user/reset')
-        this.$store.commit('org/reset')
         if (this.routerPath != '/') {
           this.$router.push('/')
         }
@@ -82,7 +86,8 @@ export default {
   },
   mounted () {
     if (this.token) {
-      this.getUsers()
+      Vue.http.headers.common['Authorization'] = this.token
+      this.verifyToken()
     }
   }
 }

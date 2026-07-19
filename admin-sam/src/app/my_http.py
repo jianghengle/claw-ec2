@@ -2,6 +2,7 @@ import simplejson as json
 from decimal import Decimal
 import base64
 from . import MyError
+from .models.user_model import UserModel
 
 
 class MyReq:
@@ -23,7 +24,7 @@ class MyReq:
         token = self.headers.get('Authorization', None)
         if token:
             self.token = token
-            #self.user = UserModel.get_by_token(token)
+            self.user = UserModel.get_by_token(token)
 
 
 def MyResp(data=None, code=200):
