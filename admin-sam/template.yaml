@@ -11,12 +11,15 @@ Globals:
     Timeout: 30
 
 Resources:
-  MyUsersTable:
+  UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: "ClawEC2Users"
+      TableName: "ClawUsers"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
+        -
+          AttributeName: "id"
+          AttributeType: "S"
         -
           AttributeName: "email"
           AttributeType: "S"
@@ -25,14 +28,85 @@ Resources:
           AttributeType: "S"
       KeySchema:
         -
-          AttributeName: "email"
+          AttributeName: "id"
           KeyType: "HASH"
       GlobalSecondaryIndexes:
+        -
+          IndexName: "emailGSI"
+          KeySchema:
+            -
+              AttributeName: "email"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
         -
           IndexName: "tokenGSI"
           KeySchema:
             -
               AttributeName: "token"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+
+  SubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "ClawSubscriptions"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        -
+          AttributeName: "id"
+          AttributeType: "S"
+        -
+          AttributeName: "userId"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "id"
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        -
+          IndexName: "userIdGSI"
+          KeySchema:
+            -
+              AttributeName: "userId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+
+  PaymentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "ClawPayments"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        -
+          AttributeName: "id"
+          AttributeType: "S"
+        -
+          AttributeName: "subscriptionId"
+          AttributeType: "S"
+        -
+          AttributeName: "checkoutSessionId"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "id"
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        -
+          IndexName: "subscriptionIdGSI"
+          KeySchema:
+            -
+              AttributeName: "subscriptionId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+        -
+          IndexName: "CheckoutSessionIdGSI"
+          KeySchema:
+            -
+              AttributeName: "checkoutSessionId"
               KeyType: "HASH"
           Projection:
             ProjectionType: "ALL"
@@ -67,8 +141,12 @@ Resources:
             ]
             Effect: Allow
             Resource:
-              - !GetAtt MyUsersTable.Arn
-              - !Join [ '/',[!GetAtt MyUsersTable.Arn, index/*]]
+              - !GetAtt UsersTable.Arn
+              - !Join [ '/',[!GetAtt UsersTable.Arn, index/*]]
+              - !GetAtt SubscriptionsTable.Arn
+              - !Join [ '/',[!GetAtt SubscriptionsTable.Arn, index/*]]
+              - !GetAtt PaymentsTable.Arn
+              - !Join [ '/',[!GetAtt PaymentsTable.Arn, index/*]]
           - Action:
               - ses:SendEmail
               - ses:SendRawEmail
@@ -103,6 +181,12 @@ Resources:
             Method: options
       Role:
         !GetAtt MyAppFunctionRole.Arn
+      Environment:
+        Variables:
+          STRIPE_KEY: ''
+          STRIPE_PRICE_KEY: ''
+          STRIPE_WEBHOOK: ''
+          APP_DOMAIN: ''
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

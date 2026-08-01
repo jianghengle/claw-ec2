@@ -1,5 +1,6 @@
 import bcrypt
 import string
+import uuid
 import secrets
 import time
 from .model import Model
@@ -8,9 +9,10 @@ from .. import MyError
 
 
 class UserModel(Model):
-    TableName = 'ClawEC2Users'
+    TableName = 'ClawUsers'
+    EmailGSI = ('emailGSI', 'email')
     TokenGSI = ('tokenGSI', 'token')
-    Fields = ['email', 'encryptedPassword', 'token', 'tokenUsedAt', 'createdAt', 'updatedAt']
+    Fields = ['id', 'email', 'encryptedPassword', 'token', 'tokenUsedAt', 'createdAt', 'updatedAt']
 
     def token_expired(self):
         return int(time.time()) - self.tokenUsedAt > 24 * 60 * 60
@@ -22,7 +24,7 @@ class UserModel(Model):
         self.tokenUsedAt = timestamp
         self.updatedAt = timestamp
         table = dynamo_service.get_table(UserModel.TableName)
-        dynamo_service.update_item(table, 'email', self.email, {
+        dynamo_service.update_item(table, 'id', self.id, {
             'token': new_token,
             'tokenUsedAt': self.tokenUsedAt,
             'updatedAt': self.updatedAt,
@@ -32,9 +34,31 @@ class UserModel(Model):
     def update_token_used_at(self):
         timestamp = int(time.time())
         table = dynamo_service.get_table(UserModel.TableName)
-        dynamo_service.update_item(table, 'email', self.email, {
+        dynamo_service.update_item(table, 'id', self.id, {
             'tokenUsedAt': timestamp
         })
+
+    @staticmethod
+    def get_by_id(id):
+        table = dynamo_service.get_table(UserModel.TableName)
+        item = dynamo_service.get_item(table, 'id', id)
+        if item:
+            return UserModel(item)
+        return None
+
+    @staticmethod
+    def get_by_email(email):
+        if not email:
+            raise MyError('No email')
+        table = dynamo_service.get_table(UserModel.TableName)
+        items = dynamo_service.query(table, UserModel.EmailGSI[0], UserModel.EmailGSI[1], email)
+        if not len(items):
+            return None
+        if len(items) > 1:
+            print('Found multiple users with same email')
+            return None
+        user = UserModel(items[0])
+        return user
 
     @staticmethod
     def get_by_token(token):
@@ -51,38 +75,19 @@ class UserModel(Model):
         return user
 
     @staticmethod
-    def auth_user(email, password):
-        table = dynamo_service.get_table(UserModel.TableName)
-        item = dynamo_service.get_item(table, 'email', email)
-        if not item:
-            raise MyError('The user does not exist.', 403)
-        user = UserModel(item)
-        if not user.encryptedPassword:
-            raise MyError('Password not set.', 403)
-        if bcrypt.checkpw(password.encode('utf-8'), user.encryptedPassword.encode('utf-8')):
-            return user
-        raise MyError('Failed to authenticate user.', 403)
-
-    @staticmethod
-    def get_by_email(email):
-        table = dynamo_service.get_table(UserModel.TableName)
-        item = dynamo_service.get_item(table, 'email', email)
-        if item:
-            return UserModel(item)
-        return None
-
-    @staticmethod
     def create(email):
         table = dynamo_service.get_table(UserModel.TableName)
+        id = str(uuid.uuid4())
         new_token = secrets.token_urlsafe(64)
         timestamp = int(time.time())
         new_user = {
+            'id': id,
             'email': email,
             'token': new_token,
             'tokenUsedAt': timestamp,
             'createdAt': timestamp,
             'updatedAt': timestamp
         }
-        dynamo_service.create_item(table, new_user, 'email')
-        item = dynamo_service.get_item(table, 'email', email)
+        dynamo_service.create_item(table, new_user, 'id')
+        item = dynamo_service.get_item(table, 'id', id)
         return UserModel(item)

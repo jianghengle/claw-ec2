@@ -13,8 +13,12 @@ class MyReq:
             return
 
         self.body = event.get('body', None)
+        self.raw_body = event.get('body', None)
         if self.body:
-            self.body = json.loads(self.body, parse_float=Decimal)
+            try:
+                self.body = json.loads(self.body, parse_float=Decimal)
+            except Exception as e:
+                pass
         self.headers = event.get('headers', {})
         self.queryStringParameters = event.get('queryStringParameters', {})
         self.requestContext = event.get('requestContext', None)

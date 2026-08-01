@@ -1,6 +1,8 @@
 from . import MyError
 from .my_http import MyReq, MyResp
 from .controllers import user_controller
+from .controllers import subscription_controller
+from .controllers import stripe_controller
 
 
 class MyRouter:
@@ -11,6 +13,9 @@ class MyRouter:
         req_method = req.method
         if req_method == 'OPTIONS':
             return MyResp()
+
+        if req.path.startswith('/stripe/'):
+            return stripe_controller.handle(req)
 
         req_path_parts = self.split_path(req.path)
         for (method, path, auth_required, handler) in self.path_handlers:
@@ -55,6 +60,9 @@ def handle(event, context):
             ('GET', '/ping', False, user_controller.ping),
             ('POST', '/send-login-link', False, user_controller.send_login_link),
             ('POST', '/verify-token', False, user_controller.verify_token),
+            ('GET', '/get-user-subscriptions', True, subscription_controller.get_user_subscriptions),
+            ('POST', '/create-subscription', True, subscription_controller.create_subscription),
+            ('POST', '/delete-subscription', True, subscription_controller.delete_subscription),
         ])
         return router.route(req)
     except MyError as err:
