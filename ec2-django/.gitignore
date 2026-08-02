@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+*__pycache__/
+*.py[cod]
+
+#Mac files
+*.DS_Store
+
+# virtual environments
+venv/
+
+config/settings/.env
+
+static/
