@@ -42,6 +42,12 @@ class PaymentModel(Model):
         return None
 
     @staticmethod
+    def get_by_subscription_id(subscription_id):
+        table = dynamo_service.get_table(PaymentModel.TableName)
+        items = dynamo_service.query(table, PaymentModel.SubscriptionIdGSI[0], PaymentModel.SubscriptionIdGSI[1], subscription_id)
+        return [PaymentModel(item) for item in items]
+
+    @staticmethod
     def create_new(user_id, subscription_id, checkout_session_id, months, payment_amount):
         table = dynamo_service.get_table(PaymentModel.TableName)
         id = str(uuid.uuid4())

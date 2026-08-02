@@ -56,7 +56,7 @@
               <div class="columns is-multiline">
                 <div class="column is-half" v-for="sub in subscriptions" :key="'sub-' + sub.id">
                   <div class="card">
-                    <header class="card-header">
+                    <header class="card-header" :class="{'is-clickable': sub.status != 'Not started'}" @click="openSubscription(sub)">
                       <p class="card-header-title">{{ sub.name }}</p>
                       <button class="card-header-icon" v-if="sub.status != 'Not started'">
                         <span class="icon">
@@ -78,7 +78,9 @@
                           <div class="field-body">
                             <div class="field is-narrow">
                               <div class="control">
-                                <span class="tag is-medium">{{ sub.status }}</span>
+                                <span class="tag is-medium status-tag" :class="{'is-success': sub.status == 'Active'}">
+                                  {{ sub.status }}
+                                </span>
                               </div>
                               <p class="help is-info" v-if="sub.status == 'Not started'">
                                 Please refresh page later after making payment.
@@ -119,6 +121,20 @@
                             </div>
                           </div>
                         </form>
+
+                        <div class="field is-horizontal" v-if="sub.status != 'Not started'">
+                          <div class="field-label is-normal">
+                            <label class="label">Period</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field is-narrow">
+                              <div class="control static-field-value">
+                                <input class="input is-static" type="text" :value="sub.periodLabel" readonly />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -218,6 +234,11 @@ export default {
       sub.months = 1
       sub.price = this.unitPrice
       sub.priceLabel = '$' + sub.price.toFixed(2)
+      if (sub.startTime) {
+        var startDate = new Date(sub.startTime * 1000)
+        var endDate = new Date(sub.endTime * 1000)
+        sub.periodLabel = startDate.toLocaleDateString('en-US') + ' ~ ' + endDate.toLocaleDateString('en-US')
+      }
       return sub
     },
     computePrice (sub) {
@@ -250,6 +271,9 @@ export default {
         this.creating = false
       })
     },
+    openSubscription (sub) {
+      this.$router.push('/subscription/' + sub.id)
+    },
   },
   mounted () {
     this.$nextTick(() => {
@@ -269,5 +293,13 @@ export default {
 </script>
 
 <style scoped>
+.status-tag {
+  position: relative;
+  top: 3px;
+}
 
+.static-field-value {
+  position: relative;
+  top: -2px;
+}
 </style>

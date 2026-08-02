@@ -63,6 +63,9 @@ def handle(event, context):
             ('GET', '/get-user-subscriptions', True, subscription_controller.get_user_subscriptions),
             ('POST', '/create-subscription', True, subscription_controller.create_subscription),
             ('POST', '/delete-subscription', True, subscription_controller.delete_subscription),
+            ('GET', '/get-subscription/:sub_id', True, subscription_controller.get_subscription),
+            ('POST', '/update-sub-name/:sub_id', True, subscription_controller.update_name),
+            ('GET', '/get-sub-payments/:sub_id', True, subscription_controller.get_sub_payments),
         ])
         return router.route(req)
     except MyError as err:

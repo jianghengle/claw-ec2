@@ -38,6 +38,15 @@ class SubscriptionModel(Model):
             updates['status'] = 'Active'
         dynamo_service.update_item(table, 'id', self.id, updates)
 
+    def update_name(self, new_name):
+        table = dynamo_service.get_table(SubscriptionModel.TableName)
+        timestamp = int(time.time())
+        updates = {
+            'name': new_name,
+            'updatedAt': timestamp,
+        }
+        dynamo_service.update_item(table, 'id', self.id, updates)
+
     @staticmethod
     def get_by_id(id):
         table = dynamo_service.get_table(SubscriptionModel.TableName)
