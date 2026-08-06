@@ -24,7 +24,8 @@ def rotate_ec2_token(request):
     ec2_token = request.data['ec2Token']
     check_ec2_token(ec2_token)
     new_ec2_token = secrets.token_urlsafe(64)
-    run_cmd('echo "' + new_ec2_token + '" > ' + EC2_TOKEN_FILE)
+    with open(EC2_TOKEN_FILE, "w", encoding="utf-8") as file:
+        file.write(new_ec2_token)
     return Response({'newEc2Token': new_ec2_token})
 
 
