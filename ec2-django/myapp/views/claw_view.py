@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import PermissionDenied
 from . import *
 
-EC2_TOKEN_FILE = '/home/.claw_django/ec2_token'
+EC2_TOKEN_FILE = '/home/ubuntu/.claw_django/ec2_token'
 CLAW_JSON_FILE = '/home/ubuntu/.openclaw/openclaw.json'
 
 
@@ -42,8 +42,8 @@ def rotate_claw_token(request):
     ec2_token = request.data['ec2Token']
     check_ec2_token(ec2_token)
     new_claw_token = secrets.token_urlsafe(32)
-    run_cmd('openclaw config set gateway.auth.token "' + new_claw_token + '"')
-    run_cmd('openclaw gateway restart')
+    run_cmd_only('openclaw config set gateway.auth.token "' + new_claw_token + '"')
+    run_cmd('systemctl --user restart openclaw-gateway.service')
     return Response({'clawToken': new_claw_token})
 
 
@@ -52,8 +52,8 @@ def set_claude_key(request):
     ec2_token = request.data['ec2Token']
     check_ec2_token(ec2_token)
     claude_key = request.data['claudeKey']
-    run_cmd('printf "%s\n" "' + claude_key + '" | openclaw models auth paste-api-key --provider anthropic')
-    run_cmd('openclaw gateway restart')
+    run_cmd_only('printf "%s\n" "' + claude_key + '" | openclaw models auth paste-api-key --provider anthropic')
+    run_cmd('systemctl --user restart openclaw-gateway.service')
     return Response({'ok': True})
 
 
