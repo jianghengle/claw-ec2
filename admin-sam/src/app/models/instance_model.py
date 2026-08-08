@@ -8,17 +8,15 @@ from decimal import Decimal
 
 class InstanceModel(Model):
     TableName = 'ClawInstances'
-    # status: Creating | Active
-    Fields = ['id', 'status', 'ec2Id', 'ec2Token', 'clawToken', 'claudeKey', 'domain', 'controlPort', 'clawPort', 'createdAt', 'updatedAt']
+    # status: Initializing | Active
+    Fields = ['id', 'ordinal', 'status', 'ec2Id', 'ec2Token', 'clawToken', 'claudeKey', 'domain', 'controlPort', 'clawPort', 'createdAt', 'updatedAt']
 
     
-    def change_status(self, status):
+    def update(self, updates):
         table = dynamo_service.get_table(InstanceModel.TableName)
         timestamp = int(time.time())
-        dynamo_service.update_item(table, 'id', self.id, {
-            'status': status,
-            'updatedAt': timestamp,
-        })
+        updates['updatedAt'] = timestamp
+        dynamo_service.update_item(table, 'id', self.id, updates)
 
     @staticmethod
     def get_by_id(id):
@@ -35,6 +33,7 @@ class InstanceModel(Model):
         timestamp = int(time.time())
         new_item = {
             'id': id,
+            'ordinal': 0,
             'status': 'Creating',
             'ec2Id': '',
             'ec2Token': '',

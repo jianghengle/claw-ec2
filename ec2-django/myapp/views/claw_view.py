@@ -104,5 +104,5 @@ def update_claude_key(key):
     timestamp = int(time.time() * 1000)
     with sqlite3.connect(store_db) as conn:
         cur = conn.cursor()
-        cur.execute(sql, (store_json, timestamp, id,))
+        cur.execute(sql, (store_json, timestamp, 'primary',))
         conn.commit()
