@@ -1,5 +1,5 @@
-Django
-django-cors-headers
-django-environ
-django-import-export
-djangorestframework
+Django==6.0.7
+django-cors-headers==4.9.0
+django-environ==0.14.0
+django-import-export==4.4.1
+djangorestframework==3.17.1

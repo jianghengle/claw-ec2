@@ -1,6 +1,6 @@
 import os, json
-import uuid
-import re
+import time
+import sqlite3
 import secrets
 from datetime import datetime, timezone, timedelta
 from rest_framework.response import Response
@@ -43,8 +43,10 @@ def rotate_claw_token(request):
     ec2_token = request.data['ec2Token']
     check_ec2_token(ec2_token)
     new_claw_token = secrets.token_urlsafe(32)
-    run_cmd_only('openclaw config set gateway.auth.token "' + new_claw_token + '"')
-    run_cmd('systemctl --user restart openclaw-gateway.service')
+    claw_config = get_claw_config()
+    claw_config['gateway']['auth']['token'] = new_claw_token
+    with open(CLAW_JSON_FILE, 'w', encoding="utf-8") as file:
+        json.dump(claw_config, file, indent=4, sort_keys=True)
     return Response({'clawToken': new_claw_token})
 
 
@@ -53,8 +55,8 @@ def set_claude_key(request):
     ec2_token = request.data['ec2Token']
     check_ec2_token(ec2_token)
     claude_key = request.data['claudeKey']
-    run_cmd_only('printf "%s\n" "' + claude_key + '" | openclaw models auth paste-api-key --provider anthropic')
-    run_cmd('systemctl --user restart openclaw-gateway.service')
+    update_claude_key(claude_key)
+    run_cmd_only('systemctl --user restart openclaw-gateway.service')
     return Response({'ok': True})
 
 
@@ -78,3 +80,29 @@ def check_ec2_token(ec2_token):
 
     if run_cmd('cat ' + file_path).strip() != ec2_token:
         raise PermissionDenied({'error': 'Access Denied. Invalid token.'})
+
+
+def update_claude_key(key):
+    store_db = '/home/ubuntu/.openclaw/agents/main/agent/openclaw-agent.sqlite'
+    sql = 'UPDATE auth_profile_store SET store_json = ?, updated_at = ? WHERE store_key = ?'
+    store = {
+        'version': 1,
+        'profiles': {
+            'anthropic:default': {
+                'type': 'api_key',
+                'provider': 'anthropic',
+                'key': key
+            },
+            'anthropic:manual': {
+                'type': 'api_key',
+                'provider': 'anthropic',
+                'key': key
+            }
+        }
+    }
+    store_json = json.dumps(store)
+    timestamp = int(time.time() * 1000)
+    with sqlite3.connect(store_db) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (store_json, timestamp, id,))
+        conn.commit()
