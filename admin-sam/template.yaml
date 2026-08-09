@@ -168,6 +168,10 @@ Resources:
               - ses:SendRawEmail
             Effect: Allow
             Resource: "*"
+          - Action:
+              - states:StartExecution
+            Effect: Allow
+            Resource: !GetAtt Ec2ProvisioningStateMachine.Arn
           Version: '2012-10-17'
         PolicyName: 'MyAppFunctionRolePolicy'
 
@@ -203,6 +207,193 @@ Resources:
           STRIPE_PRICE_KEY: ''
           STRIPE_WEBHOOK: ''
           APP_DOMAIN: ''
+
+  Ec2CreationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [lambda.amazonaws.com]
+        Version: '2012-10-17'
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - ec2:RunInstances
+              - ec2:CreateTags
+              - ec2:CreateSecurityGroup
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:AuthorizeSecurityGroupEgress
+              - ec2:RevokeSecurityGroupIngress
+              - ec2:RevokeSecurityGroupEgress
+              - ec2:ModifyInstanceAttribute
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeImages
+              - ec2:DescribeKeyPairs
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+            Effect: Allow
+            Resource:
+              - !GetAtt InstancesTable.Arn
+              - !Join [ '/',[!GetAtt InstancesTable.Arn, index/*]]
+          - Action:
+              - elasticloadbalancing:CreateTargetGroup
+              - elasticloadbalancing:RegisterTargets
+              - elasticloadbalancing:DeregisterTargets
+              - elasticloadbalancing:CreateListener
+              - elasticloadbalancing:DescribeLoadBalancers
+              - elasticloadbalancing:DescribeTargetGroups
+              - elasticloadbalancing:DescribeListeners
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - acm:ListCertificates
+              - acm:DescribeCertificate
+            Effect: Allow
+            Resource: "*"
+          Version: '2012-10-17'
+        PolicyName: 'Ec2CreationFunctionRolePolicy'
+
+  Ec2CreationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.ec2_handler.handle_creation
+      Runtime: python3.14
+      Architectures:
+        - arm64
+      Timeout: 60
+      Role:
+        !GetAtt Ec2CreationFunctionRole.Arn
+
+  Ec2CheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.ec2_handler.handle_check
+      Runtime: python3.14
+      Architectures:
+        - arm64
+      Timeout: 60
+      Role:
+        !GetAtt Ec2CreationFunctionRole.Arn
+
+  Ec2SetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.ec2_handler.handle_setup
+      Runtime: python3.14
+      Architectures:
+        - arm64
+      Timeout: 60
+      Role:
+        !GetAtt Ec2CreationFunctionRole.Arn
+
+  Ec2ProvisioningStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [states.amazonaws.com]
+        Version: '2012-10-17'
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+              - lambda:InvokeFunction
+            Effect: Allow
+            Resource:
+              - !GetAtt Ec2CreationFunction.Arn
+              - !GetAtt Ec2CheckFunction.Arn
+              - !GetAtt Ec2SetupFunction.Arn
+          Version: '2012-10-17'
+        PolicyName: 'Ec2ProvisioningStateMachinePolicy'
+
+  Ec2ProvisioningStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: Ec2ProvisioningStateMachine
+      Role: !GetAtt Ec2ProvisioningStateMachineRole.Arn
+      Definition:
+        Comment: "Provision an EC2 instance: create, wait for ready, then setup"
+        StartAt: CreateInstance
+        TimeoutSeconds: 900
+        States:
+          CreateInstance:
+            Type: Task
+            Resource: !GetAtt Ec2CreationFunction.Arn
+            InputPath: "$"
+            ResultPath: "$.createResult"
+            Next: InitRetryCount
+          InitRetryCount:
+            Type: Pass
+            Result:
+              count: 0
+            ResultPath: "$.retryCount"
+            Next: WaitForReady
+          WaitForReady:
+            Type: Wait
+            Seconds: 30
+            Next: CheckInstance
+          CheckInstance:
+            Type: Task
+            Resource: !GetAtt Ec2CheckFunction.Arn
+            InputPath: "$"
+            ResultPath: "$.checkResult"
+            Next: IsReady
+          IsReady:
+            Type: Choice
+            Choices:
+              - Variable: "$.checkResult.result"
+                BooleanEquals: true
+                Next: SetupInstance
+            Default: IncrementRetry
+          IncrementRetry:
+            Type: Pass
+            ResultPath: "$.retryCount"
+            Parameters:
+              "count.$": "States.MathAdd($.retryCount.count, 1)"
+            Next: CheckRetryLimit
+          CheckRetryLimit:
+            Type: Choice
+            Choices:
+              - Variable: "$.retryCount.count"
+                NumericGreaterThanEquals: 20
+                Next: TimeoutFail
+            Default: WaitForReady
+          TimeoutFail:
+            Type: Fail
+            Cause: "EC2 instance did not pass status checks within 10 minutes"
+            Error: "CheckTimeout"
+          SetupInstance:
+            Type: Task
+            Resource: !GetAtt Ec2SetupFunction.Arn
+            InputPath: "$"
+            End: true
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

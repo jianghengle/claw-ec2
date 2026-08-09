@@ -8,6 +8,6 @@ handler = "app.lambda_handler.handle"
 source_hash = "977e6ddcdf79ad552e7fc67267b17c9e35849aa1be524b98b2bbc9390540ca12"
 manifest_hash = "36ab35f39760353b959b19c3afa45aec"
 packagetype = "Zip"
-functions = ["MyAppFunction"]
+functions = ["MyAppFunction", "Ec2CreationFunction", "Ec2CheckFunction", "Ec2SetupFunction"]
 
 [layer_build_definitions]

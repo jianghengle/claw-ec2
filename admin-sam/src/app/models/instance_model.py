@@ -8,8 +8,8 @@ from decimal import Decimal
 
 class InstanceModel(Model):
     TableName = 'ClawInstances'
-    # status: Initializing | Active
-    Fields = ['id', 'ordinal', 'status', 'ec2Id', 'ec2Token', 'clawToken', 'claudeKey', 'domain', 'controlPort', 'clawPort', 'createdAt', 'updatedAt']
+    # status: Creating | Initializing | Active
+    Fields = ['id', 'status', 'ordinal', 'imageId', 'instanceId', 'instanceName', 'loadBalancerArn', 'ec2Token', 'clawToken', 'claudeKey', 'domain', 'controlPort', 'clawPort', 'createdAt', 'updatedAt']
 
     
     def update(self, updates):
@@ -34,8 +34,11 @@ class InstanceModel(Model):
         new_item = {
             'id': id,
             'ordinal': 0,
-            'status': 'Creating',
-            'ec2Id': '',
+            'imageId': '',
+            'instanceId': '',
+            'instanceName': '',
+            'status': '',
+            'loadBalancerArn': '',
             'ec2Token': '',
             'clawToken': '',
             'claudeKey': '',
