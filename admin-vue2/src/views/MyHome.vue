@@ -135,6 +135,21 @@
                           </div>
                         </div>
 
+                        <div class="field is-horizontal" v-if="sub.status == 'Active' && !sub.instanceId">
+                          <div class="field-label is-normal">
+                            <label class="label">EC2</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field is-narrow">
+                              <div class="control">
+                                <button class="button is-link" :class="{'is-loading': launching}" @click="launchEc2(sub)">
+                                  Launch EC2
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -182,6 +197,8 @@ export default {
       sent: false,
       subscriptions: null,
       creating: false,
+      instances: {},
+      launching: false,
     }
   },
   computed: {
@@ -239,6 +256,9 @@ export default {
         var endDate = new Date(sub.endTime * 1000)
         sub.periodLabel = startDate.toLocaleDateString('en-US') + ' ~ ' + endDate.toLocaleDateString('en-US')
       }
+      if (data.instanceId === undefined) {
+        sub.instanceId = null
+      }
       return sub
     },
     computePrice (sub) {
@@ -273,6 +293,19 @@ export default {
     },
     openSubscription (sub) {
       this.$router.push('/subscription/' + sub.id)
+    },
+    launchEc2 (sub) {
+      var message = {subscriptionId: sub.id}
+      this.launching = true
+      this.$http.post(this.server + '/create-subscription-instance', message).then(resp => {
+        var instances = {...this.instances, [subId]: resp.body}
+        this.instances = instances
+        sub.instanceId = resp.body.id
+        this.launching = false
+      }).catch(err => {
+        this.error = err.body
+        this.launching = false
+      })
     },
   },
   mounted () {

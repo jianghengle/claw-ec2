@@ -2,6 +2,10 @@ import json
 import uuid
 import random
 import boto3
+import time
+import requests
+import urllib.parse
+import urllib.request
 from .models.instance_model import InstanceModel
 
 
@@ -293,6 +297,9 @@ def handle_setup(event, context):
             ],
         )
 
+    # Rotate tokens
+    rotate_tokens(instance_record)
+
     # Update status to Active
     instance_record.update({'status': 'Active'})
 
@@ -304,3 +311,27 @@ def handle_setup(event, context):
             'targetGroupCtrl': tg_ctrl_arn,
         })
     }
+
+def rotate_tokens(instance):
+    time.sleep(10)
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        url = 'https://' + instance.domain + ':' + instance.controlPort + '/myapp/rotate-ec2-token/'
+        payload = {"ec2Token": instance.ec2Token}
+        response = requests.post(url, json=payload, headers=headers)
+        resp = response.json()
+        newEc2Token = resp['newEc2Token']
+        instance.update({'ec2Token': newEc2Token})
+
+        url = 'https://' + instance.domain + ':' + instance.controlPort + '/myapp/rotate-claw-token/'
+        payload = {"ec2Token": newEc2Token}
+        response = requests.post(url, json=payload, headers=headers)
+        resp = response.json()
+        clawToken = resp['clawToken']
+        instance.update({'clawToken': clawToken})
+    except Exception as e:
+        print(f"Error rotating EC2 token: {e}")
+        raise e

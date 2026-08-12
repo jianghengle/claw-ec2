@@ -3,6 +3,7 @@ from .my_http import MyReq, MyResp
 from .controllers import user_controller
 from .controllers import subscription_controller
 from .controllers import stripe_controller
+from .controllers import instance_controller
 
 
 class MyRouter:
@@ -66,6 +67,7 @@ def handle(event, context):
             ('GET', '/get-subscription/:sub_id', True, subscription_controller.get_subscription),
             ('POST', '/update-sub-name/:sub_id', True, subscription_controller.update_name),
             ('GET', '/get-sub-payments/:sub_id', True, subscription_controller.get_sub_payments),
+            ('POST', '/create-subscription-instance', True, instance_controller.create_subscription_instance),
         ])
         return router.route(req)
     except MyError as err:

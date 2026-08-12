@@ -47,6 +47,15 @@ class SubscriptionModel(Model):
         }
         dynamo_service.update_item(table, 'id', self.id, updates)
 
+    def update_instance_id(self, instance_id):
+        table = dynamo_service.get_table(SubscriptionModel.TableName)
+        timestamp = int(time.time())
+        updates = {
+            'instanceId': instance_id,
+            'updatedAt': timestamp,
+        }
+        dynamo_service.update_item(table, 'id', self.id, updates)
+
     @staticmethod
     def get_by_id(id):
         table = dynamo_service.get_table(SubscriptionModel.TableName)
