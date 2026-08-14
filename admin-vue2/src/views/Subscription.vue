@@ -25,7 +25,7 @@
         </div>
 
         <div v-if="!waiting && subscription">
-          <div>
+          <div class="mb-6">
             <h5 class="title is-5">Subscription info</h5>
 
             <div class="field">
@@ -66,8 +66,63 @@
 
           <hr />
 
-          <div>
+          <div class="mb-6">
             <h5 class="title is-5">EC2 instance</h5>
+
+            <div class="field">
+              <label class="label">Status</label>
+              <div class="control">
+                <span class="tag is-medium" :class="{'is-success': instance && (instance.status == 'Active')}">
+                  {{ instance ? instance.status : 'None' }}
+                </span>
+                <span class="icon status-spinner" v-if="refreshing">
+                  <i class="fas fa-spinner fa-pulse"></i>
+                </span>
+              </div>
+              <p class="help is-info" v-if="instance && (instance.status == 'Creating' || instance.status == 'Initializing')">
+                It might take up to 10 minutes to launch EC2 ...
+              </p>
+            </div>
+
+            <div class="field" v-if="!instance && subscription.status == 'Active' && !subscription.instanceId">
+              <label class="label">EC2</label>
+              <div class="control">
+                <button class="button is-link" :class="{'is-loading': launching}" @click="launchEc2">
+                  Launch EC2
+                </button>
+              </div>
+            </div>
+
+            <div class="field" v-if="instance && instance.status == 'Active'">
+              <label class="label">Claw</label>
+              <div class="control">
+                <a class="button" target="_blank" :href="'https://' + instance.domain + ':' + instance.clawPort + '/?token=' + instance.clawToken">
+                  <span>Secure Claw URL</span>
+                  <span class="icon is-small">
+                    <i class="fas fa-external-link-alt"></i>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div class="field" v-if="instance && instance.status == 'Active'">
+              <label class="label">Claude API Key</label>
+              <div class="control">
+                <button class="button" @click="openKeyModal">
+                  <span>Set</span>
+                  <span class="icon is-small">
+                    <i class="fas fa-key"></i>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <article class="message is-info mt-5">
+              <div class="message-body">
+                Contact <a href="mailto:support@bee-archi.com">support@bee-archi.com</a> for more info or operations like public DNS, opening ports etc.
+              </div>
+            </article>
+
           </div>
 
           <hr />
@@ -134,15 +189,21 @@
           
         </div>
       </div>
+
+      <key-modal :opened="keyModal.opened" :subscription="subscription" @closeKeyModal="closeKeyModal"></key-modal>
     </div>
   </div>
 </template>
 
 <script>
 import Vue from 'vue'
+import KeyModal from '../components/modals/KeyModal.vue'
 
 export default {
   name: 'subscription',
+  components: {
+    KeyModal
+  },
   data () {
     return {
       waiting: false,
@@ -152,6 +213,13 @@ export default {
       updating: false,
       months: 1,
       payments: null,
+      instance: null,
+      launching: false,
+      keyModal: {
+        opened: false,
+      },
+      interval: null,
+      refreshing: false,
     }
   },
   computed: {
@@ -185,9 +253,11 @@ export default {
     getSunscription () {
       this.waiting = true
       this.error = ''
-      const uri = `${this.server}/get-subscription`
       this.$http.get(this.server + '/get-subscription/' + this.subscriptionId).then(resp => {
         this.buildSubscription(resp.body)
+        if (this.subscription.instanceId) {
+          this.getInstance()
+        }
         this.waiting = false
       }, (err) => {
         this.error = err.body
@@ -228,7 +298,47 @@ export default {
     buildPayment (data) {
       var payment = {...data}
       return payment
-    }
+    },
+    getInstance () {
+      this.refreshing = true
+      this.$http.get(this.server + '/get-sub-instance/' + this.subscriptionId).then(resp => {
+        this.instance = resp.body
+        this.refreshing = false
+      }, (err) => {
+        this.error = err.body
+        this.refreshing = false
+      })
+    },
+    launchEc2 () {
+      var message = {subscriptionId: this.subscriptionId}
+      this.launching = true
+      this.$http.post(this.server + '/create-subscription-instance', message).then(resp => {
+        this.instance = resp.body
+        this.subscription.instanceId = resp.body.id
+        this.refreshInstance()
+        this.launching = false
+      }).catch(err => {
+        this.error = err.body
+        this.launching = false
+      })
+    },
+    refreshInstance () {
+      if (this.interval) {
+        return
+      }
+      this.interval = setInterval(() => {
+        if (this.instance.status == 'Active') {
+          clearInterval(this.interval)
+        }
+        this.getInstance()
+      }, 5000);
+    },
+    openKeyModal () {
+      this.keyModal.opened = true
+    },
+    closeKeyModal () {
+      this.keyModal.opened = false
+    },
   },
   mounted () {
     if (this.token) {

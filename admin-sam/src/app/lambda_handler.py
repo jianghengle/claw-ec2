@@ -68,6 +68,8 @@ def handle(event, context):
             ('POST', '/update-sub-name/:sub_id', True, subscription_controller.update_name),
             ('GET', '/get-sub-payments/:sub_id', True, subscription_controller.get_sub_payments),
             ('POST', '/create-subscription-instance', True, instance_controller.create_subscription_instance),
+            ('GET', '/get-sub-instance/:sub_id', True, instance_controller.get_sub_instance),
+            ('POST', '/set-sub-claude-key', True, instance_controller.set_sub_claude_key),
         ])
         return router.route(req)
     except MyError as err:

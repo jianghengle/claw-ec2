@@ -135,7 +135,7 @@
                           </div>
                         </div>
 
-                        <div class="field is-horizontal" v-if="sub.status == 'Active' && !sub.instanceId">
+                        <div class="field is-horizontal" v-if="sub.status == 'Active' && !sub.instanceId && !subInstanceMap[sub.id]">
                           <div class="field-label is-normal">
                             <label class="label">EC2</label>
                           </div>
@@ -144,6 +144,53 @@
                               <div class="control">
                                 <button class="button is-link" :class="{'is-loading': launching}" @click="launchEc2(sub)">
                                   Launch EC2
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <hr v-if="subInstanceMap[sub.id]" />
+
+                        <div class="field is-horizontal" v-if="subInstanceMap[sub.id]">
+                          <div class="field-label is-normal">
+                            <label class="label">EC2</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field is-narrow">
+                              <div class="control">
+                                <span class="tag is-medium status-tag" :class="{'is-success': subInstanceMap[sub.id].status == 'Active'}" v-if="!refreshing">
+                                  {{ subInstanceMap[sub.id].status }}
+                                </span>
+                                <span class="icon status-spinner" v-else>
+                                  <i class="fas fa-spinner fa-pulse"></i>
+                                </span>
+                              </div>
+                              <p class="help is-info" v-if="subInstanceMap[sub.id].status != 'Active'">
+                                It might take up to 10 minutes to launch EC2 ...
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="field is-horizontal" v-if="subInstanceMap[sub.id] && subInstanceMap[sub.id].status == 'Active'">
+                          <div class="field-label is-normal">
+                            <label class="label claw-label">Claw</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field is-narrow">
+                              <div class="control">
+                                <a class="button is-ghost claw-url" target="_blank" :href="'https://' + subInstanceMap[sub.id].domain + ':' + subInstanceMap[sub.id].clawPort + '/?token=' + subInstanceMap[sub.id].clawToken">
+                                  <span>Secure Claw URL</span>
+                                  <span class="icon is-small">
+                                    <i class="fas fa-external-link-alt"></i>
+                                  </span>
+                                </a>
+                                <button class="button ml-3" @click="openKeyModal(sub)">
+                                  <span class="icon is-small">
+                                    <i class="fas fa-key"></i>
+                                  </span>
+                                  <span>API Key</span>
                                 </button>
                               </div>
                             </div>
@@ -162,7 +209,7 @@
             </div>
           </div>
 
-          <div class="buttons mt-6">
+          <div class="buttons mt-6 mb-6">
             <a class="button" :class="{'is-loading': creating}" @click="createSubscription">
               <span class="icon">
                 <i class="fas fa-plus"></i>
@@ -173,20 +220,37 @@
 
           <hr/>
 
-          <div>
-            demo
+          <div class="mt-6">
+            <div class="field">
+              <label class="label">Demo EC2</label>
+              <div class="control">
+                <a class="button" target="_blank" href="https://mailapp.myworkflowhub.com:18789/?token=kEd_rF5vcUJM15E0">
+                  <span>Demo Claw URL</span>
+                  <span class="icon is-small">
+                    <i class="fas fa-external-link-alt"></i>
+                  </span>
+                </a>
+              </div>
+              <p class="help is-info">Shared demo claw EC2. Please try it out respectfully.</p>
+            </div>
+
           </div>
         </div>
       </div>
+
+      <key-modal :opened="keyModal.opened" :subscription="keyModal.subscription" @closeKeyModal="closeKeyModal"></key-modal>
 
     </div>
   </div>
 </template>
 
 <script>
+import KeyModal from '../components/modals/KeyModal.vue'
+
 export default {
   name: 'my-home',
   components: {
+    KeyModal
   },
   data () {
     return {
@@ -197,8 +261,14 @@ export default {
       sent: false,
       subscriptions: null,
       creating: false,
-      instances: {},
+      subInstanceMap: {},
       launching: false,
+      keyModal: {
+        opened: false,
+        subscription: null,
+      },
+      interval: null,
+      refreshing: false,
     }
   },
   computed: {
@@ -214,11 +284,6 @@ export default {
     emailValid () {
       var re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
       return re.test(this.email.trim().toLowerCase())
-    },
-  },
-  watch: {
-    token: function (val) {
-      
     },
   },
   methods: {
@@ -298,14 +363,44 @@ export default {
       var message = {subscriptionId: sub.id}
       this.launching = true
       this.$http.post(this.server + '/create-subscription-instance', message).then(resp => {
-        var instances = {...this.instances, [subId]: resp.body}
-        this.instances = instances
+        this.subInstanceMap[sub.id] = resp.body
         sub.instanceId = resp.body.id
+        this.refreshInstance(sub.id)
         this.launching = false
       }).catch(err => {
         this.error = err.body
         this.launching = false
       })
+    },
+    refreshInstance (subId) {
+      if (this.interval) {
+        return
+      }
+      this.interval = setInterval(() => {
+        var instance = this.subInstanceMap[subId]
+        if (instance.status == 'Active') {
+          clearInterval(this.interval)
+        }
+        this.getSubscriptionInstance(subId)
+      }, 5000);
+    },
+    getSubscriptionInstance (subId) {
+      this.refreshing = true
+      this.$http.get(this.server + '/get-sub-instance/' + subId).then(resp => {
+        this.subInstanceMap[subId] = resp.body
+        this.refreshing = false
+      }).catch(err => {
+        this.error = err.body
+        this.refreshing = false
+      })
+    },
+    openKeyModal (subscription) {
+      this.keyModal.subscription = subscription
+      this.keyModal.opened = true
+    },
+    closeKeyModal () {
+      this.keyModal.subscription = null
+      this.keyModal.opened = false
     },
   },
   mounted () {
@@ -313,7 +408,19 @@ export default {
       if (this.token) {
         this.waiting = true
         this.$http.get(this.server + '/get-user-subscriptions').then(resp => {
-          this.subscriptions = resp.body.map(this.makeSubscription)
+          var subscriptions = resp.body.map(this.makeSubscription)
+          var subInstanceMap = {}
+          for (var sub of subscriptions) {
+            subInstanceMap[sub.id] = null
+          }
+          this.subInstanceMap = subInstanceMap
+          this.subscriptions = subscriptions
+          for (var sub of subscriptions) {
+            if (sub.instanceId) {
+              let subId = sub.id
+              this.getSubscriptionInstance(subId)
+            }
+          }
         }).catch(err => {
           this.error = err.body
         }).finally(() => {
@@ -321,6 +428,11 @@ export default {
         })
       }
     })
+  },
+  unmounted () {
+    if (this.interval) {
+      clearInterval(this.interval)
+    }
   },
 }
 </script>
@@ -331,8 +443,22 @@ export default {
   top: 3px;
 }
 
+.status-spinner {
+  position: relative;
+  top: 4px;
+}
+
 .static-field-value {
   position: relative;
   top: -2px;
+}
+
+.claw-label {
+  position: relative;
+  top: 2px;
+}
+
+.claw-url {
+  padding-left: 0px !important;
 }
 </style>

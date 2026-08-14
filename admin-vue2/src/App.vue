@@ -3,6 +3,15 @@
     <my-header />
     <router-view />
     <confirm-modal />
+
+    <footer class="footer mt-6">
+      <div class="content has-text-centered">
+        <p>
+          <strong>Claw EC2</strong> by <a href="https://bee-archi.com">Bee-Archi.com</a>.
+          Contact support at <a href="mailto:support@bee-archi.com">support@bee-archi.com</a>
+        </p>
+      </div>
+    </footer>
   </div>
 </template>
 

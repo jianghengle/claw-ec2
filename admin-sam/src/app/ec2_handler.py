@@ -313,7 +313,7 @@ def handle_setup(event, context):
     }
 
 def rotate_tokens(instance):
-    time.sleep(10)
+    time.sleep(20)
     try:
         headers = {
             "Content-Type": "application/json",

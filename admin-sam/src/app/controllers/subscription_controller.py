@@ -39,4 +39,3 @@ def get_sub_payments(req, sub_id):
         if p.status == 'Paid':
             payments_data.append(p.data)
     return payments_data
-
