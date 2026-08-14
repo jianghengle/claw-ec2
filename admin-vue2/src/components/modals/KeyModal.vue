@@ -11,7 +11,7 @@
           <div class="field">
             <label class="label">API Key</label>
             <div class="control">
-              <textarea class="textarea" placeholder="sk-ant-api..." v-model="newKey"></textarea>
+              <textarea class="textarea" v-model="newKey"></textarea>
             </div>
             <p class="help is-info">The API key will be set directly on EC2. We NEVER save it anywhere else.</p>
           </div>
